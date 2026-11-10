@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fentanyl Drug Supply Watch</title>
+<meta name="description" content="A public-health dashboard on fentanyl, emerging adulterants, overdose trends, news and the treatment gap in the U.S.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root {
+  --font-anthropic-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-anthropic-serif: 'Source Serif 4', Georgia, serif;
+  --color-fg:#1c1b19; --color-fg-muted:#6b675f; --color-bg:#faf9f6; --color-panel:#ffffff; --color-border-line:#e4e1d9;
+  --color-ok:#2f7d4f; --color-warn:#b45309; --color-bad:#c0392b;
+  --cds-font-size-caption:.8125rem; --cds-font-size-body:1rem; --cds-font-size-heading:1.25rem; --cds-font-size-title:2.25rem; --cds-font-weight-medium:600;
+  --cds-gap-xs:4px; --cds-gap-sm:8px; --cds-gap-md:16px; --cds-gap-lg:24px; --cds-gap-xl:40px;
+  --cds-pad-xs:4px; --cds-pad-sm:8px; --cds-pad-md:12px; --cds-pad-lg:20px; --cds-pad-xl:32px; --cds-radius:10px;
+  --chart-1:#c2410c; --cds-chart-muted:#d9d4c7; --cds-chart-grid:#ece9e1; --cds-chart-axis:#c9c4b8;
+  --cds-surface-popover:#ffffff; --cds-border:#e4e1d9; --cds-shadow-popover:0 4px 16px rgba(0,0,0,.12); --cds-text-secondary:#6b675f;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --color-fg:#ece9e2; --color-fg-muted:#a29d93; --color-bg:#181715; --color-panel:#22211e; --color-border-line:#36342f;
+  --color-ok:#5cbf83; --color-warn:#e0a24a; --color-bad:#e8695b;
+  --chart-1:#f08a4b; --cds-chart-muted:#4a4740; --cds-chart-grid:#2f2d29; --cds-chart-axis:#4a4740;
+  --cds-surface-popover:#2a2925; --cds-border:#3a3833; --cds-text-secondary:#a29d93; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--color-bg); color:var(--color-fg); font-family:var(--font-anthropic-sans); }
+#dash-root { max-width: 1100px; margin: 0 auto; padding: 32px 16px 64px; }
+.dash-select { font: inherit; font-size: var(--cds-font-size-caption); color: var(--color-fg); background-color: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 8px; padding: 6px 10px; }
+.fw details ul { padding-left: 1.2em; }
+.fw details a { color: var(--color-fg-muted); }
+
+.fw { font-family: var(--font-anthropic-sans); color: var(--color-fg); display: flex; flex-direction: column; gap: var(--cds-gap-xl); }
+.fw h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0 0 var(--cds-gap-sm); }
+.fw h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0 0 var(--cds-gap-xs); }
+.fw h3 { font-size: var(--cds-font-size-body); font-weight: var(--cds-font-weight-medium); margin: 0 0 var(--cds-gap-xs); }
+.fw p { margin: 0; line-height: 1.5; }
+.fw-muted { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.fw-lede { font-size: var(--cds-font-size-body); max-width: 70ch; }
+.fw-nav { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); margin-top: var(--cds-gap-md); }
+.fw-nav a { font-size: var(--cds-font-size-caption); color: var(--color-fg); text-decoration: none; border: 1px solid var(--color-border-line); border-radius: 999px; padding: 4px 12px; }
+.fw-alert { border: 1px solid var(--color-bad); border-left-width: 4px; border-radius: var(--cds-radius); padding: var(--cds-pad-md) var(--cds-pad-lg); background: var(--color-panel); }
+.fw-alert strong { color: var(--color-bad); }
+.fw-alert ul { margin: var(--cds-gap-xs) 0 0; padding-left: 1.2em; line-height: 1.5; }
+.fw-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); min-width: 0; }
+.fw-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--cds-gap-md); }
+.fw-big { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: 2.2rem; line-height: 1.1; font-variant-numeric: tabular-nums; margin: var(--cds-gap-xs) 0; }
+.fw-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--cds-gap-md); }
+.fw-chart { position: relative; min-height: 240px; }
+.fw-chart svg text { fill: var(--cds-text-secondary); font-size: var(--cds-font-size-caption); font-family: var(--font-anthropic-sans); }
+.fw-chart .tick line { stroke: var(--cds-chart-grid); }
+.fw-chart .domain { stroke: var(--cds-chart-axis); }
+.fw-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); border-radius: var(--cds-radius); padding: 6px 10px; font-size: var(--cds-font-size-caption); white-space: nowrap; z-index: 2; }
+.fw-subs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--cds-gap-md); margin-top: var(--cds-gap-md); }
+.fw-sub h3 { font-size: var(--cds-font-size-body); }
+.fw-sub dl { margin: var(--cds-gap-sm) 0 0; display: grid; gap: 6px; font-size: var(--cds-font-size-caption); }
+.fw-sub dt { color: var(--color-fg-muted); }
+.fw-sub dd { margin: 0; line-height: 1.45; }
+.fw-tag { display: inline-block; font-size: var(--cds-font-size-caption); border-radius: 999px; padding: 1px 8px; border: 1px solid var(--color-border-line); }
+.fw-tag.no { border-color: var(--color-warn); color: var(--color-warn); }
+.fw-news-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: var(--cds-gap-sm); }
+.fw-news { list-style: none; margin: var(--cds-gap-md) 0 0; padding: 0; display: grid; gap: var(--cds-gap-sm); }
+.fw-news li { border-bottom: 1px solid var(--color-border-line); padding-bottom: var(--cds-gap-sm); display: grid; gap: 2px; }
+.fw-news a { color: var(--color-fg); text-decoration: none; font-weight: var(--cds-font-weight-medium); }
+.fw-news a:hover { text-decoration: underline; }
+.fw-help { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--cds-gap-md); }
+.fw-help ul { margin: var(--cds-gap-xs) 0 0; padding-left: 1.1em; line-height: 1.55; font-size: var(--cds-font-size-body); }
+.fw-help a { color: var(--color-fg); }
+.fw-phone { font-variant-numeric: tabular-nums; font-weight: var(--cds-font-weight-medium); }
+.fw details summary { cursor: pointer; font-weight: var(--cds-font-weight-medium); }
+.fw details p, .fw details li { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.5; }
+[data-dash-source-state=refreshing] { opacity: .5; }
+</style>
+</head>
+<body>
+<main id="dash-root">
+<div class="fw">
+  <header id="top">
+    <h1>Fentanyl Drug Supply Watch</h1>
+    <p class="fw-lede">Overdose deaths are falling, but the drug supply is getting less predictable. Predicted U.S. overdose deaths were <b data-draw="od-latest" data-source="od_change" data-field="latest_deaths" data-row="0">—</b> in the <span data-draw="od-latest-label">—</span>, down <b data-draw="od-change" data-source="od_change" data-field="pct_change" data-row="0">—</b> from <span data-draw="od-base-label">—</span>. Meanwhile, sedatives that naloxone can't reverse and opioids stronger than fentanyl keep turning up in pills and powders.</p>
+    <p class="fw-muted" style="margin-top:var(--cds-gap-xs)">Compiled from CDC, DEA, SAMHSA and news reports, current to November 2026. Every figure is sourced; see Sources at the bottom of the page.</p>
+    <nav class="fw-nav" aria-label="Sections">
+      <a href="#supply">Supply snapshot</a>
+      <a href="#watch">What to watch for</a>
+      <a href="#news">News</a>
+      <a href="#treatment">Treatment gap</a>
+      <a href="#help">Get help</a>
+    </nav>
+  </header>
+
+  <aside class="fw-alert" id="safety" aria-label="Overdose safety">
+    <p><strong>If someone may be overdosing:</strong> call 911, give naloxone (Narcan), and give rescue breaths. Give naloxone even if you think a sedative like xylazine or medetomidine is involved, since fentanyl is almost always there too. Stay with them; effects can return.</p>
+    <ul>
+      <li>Any pill not handed to you by a pharmacist may be counterfeit. You can't tell by looking.</li>
+      <li>Test with fentanyl and xylazine test strips. Strips can miss carfentanil and nitazenes, so a negative isn't a guarantee.</li>
+      <li>Don't use alone. Carry naloxone, and start with a small amount.</li>
+    </ul>
+  </aside>
+
+  <section id="supply">
+    <h2>Supply snapshot</h2>
+    <div class="fw-tiles">
+      <div class="fw-card" id="tile-deaths">
+        <h3>Overdose deaths</h3>
+        <p class="fw-muted">12 months to May 2026, predicted</p>
+        <div class="fw-big" data-draw="t-deaths" data-source="overdose_trend" data-field="deaths_all" data-where="period_end=2026-05">—</div>
+        <p class="fw-muted">CDC provisional count</p>
+      </div>
+      <div class="fw-card" id="tile-pills">
+        <h3>Fake pills with a lethal dose</h3>
+        <p class="fw-muted">DEA lab tests, fiscal 2025</p>
+        <div class="fw-big" data-draw="t-pills" data-source="pill_lethality" data-field="pct_lethal" data-where="year=FY2025">—</div>
+        <p class="fw-muted">of fentanyl pills tested held 2 mg or more</p>
+      </div>
+      <div class="fw-card" id="tile-mede">
+        <h3>Medetomidine reports</h3>
+        <p class="fw-muted">Drug-seizure lab reports, 2025</p>
+        <div class="fw-big" data-draw="t-mede" data-source="medetomidine" data-field="nflis_reports" data-where="year=2025">—</div>
+        <p class="fw-muted">up from 247 in 2023</p>
+      </div>
+      <div class="fw-card" id="tile-treat">
+        <h3>Got treatment</h3>
+        <p class="fw-muted">People who needed it, 2025</p>
+        <div class="fw-big" data-draw="t-treat" data-source="treatment_gap" data-field="pct_received" data-where="group=Any substance use disorder">—</div>
+        <p class="fw-muted">about 1 in 6</p>
+      </div>
+    </div>
+
+    <div class="fw-grid2" style="margin-top:var(--cds-gap-md)">
+      <div class="fw-card" id="chart-deaths">
+        <h3>Predicted overdose deaths, rolling 12 months</h3>
+        <p class="fw-muted">Each point is the 12 months ending that month. Later releases revise these upward slightly.</p>
+        <div class="fw-chart" data-draw="c-deaths" data-source="overdose_trend"></div>
+      </div>
+      <div class="fw-card" id="chart-pills">
+        <h3>Share of fentanyl pills with a potentially lethal dose</h3>
+        <p class="fw-muted">DEA lab testing. Lower purity doesn't mean safe: dose still varies pill to pill.</p>
+        <div class="fw-chart" data-draw="c-pills" data-source="pill_lethality"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="watch">
+    <h2>What to watch for</h2>
+    <p class="fw-lede">These are showing up in drugs sold as something else. Many people who die never knew they took them.</p>
+    <div class="fw-subs" data-draw="subs" data-source="adulterants"></div>
+
+    <div class="fw-card" id="chart-mede" style="margin-top:var(--cds-gap-md)">
+      <h3>Medetomidine is spreading fast</h3>
+      <p class="fw-muted">Times medetomidine was identified in drug-seizure lab reports (NFLIS). Mostly Northeast and Midwest so far, now detected in California too.</p>
+      <div class="fw-chart" data-draw="c-mede" data-source="medetomidine" style="min-height:200px"></div>
+    </div>
+  </section>
+
+  <section id="news">
+    <div class="fw-news-head">
+      <div>
+        <h2>News</h2>
+        <p class="fw-muted">Precursor chemicals, trade with China, India and Mexico, laws, pharma and the overall crisis.</p>
+      </div>
+      <select class="dash-select" data-draw="topic" data-source="news" aria-label="Filter news by topic"></select>
+    </div>
+    <ul class="fw-news" data-draw="news-list" data-source="news"></ul>
+  </section>
+
+  <section id="treatment">
+    <h2>The treatment gap</h2>
+    <p class="fw-lede">Medications like buprenorphine and methadone cut the risk of dying from an overdose, yet most people who need treatment don't get it. Since 2026, buprenorphine can be started by telehealth, including by phone.</p>
+    <div class="fw-card" id="chart-gap" style="margin-top:var(--cds-gap-md)">
+      <h3>Share of people who needed care and got it, 2025</h3>
+      <p class="fw-muted">SAMHSA National Survey on Drug Use and Health.</p>
+      <div class="fw-chart" data-draw="c-gap" data-source="treatment_gap" style="min-height:150px"></div>
+    </div>
+  </section>
+
+  <section id="help">
+    <h2>Get help</h2>
+    <div class="fw-help">
+      <div class="fw-card">
+        <h3>Right now</h3>
+        <ul>
+          <li>Emergency: <span class="fw-phone">911</span></li>
+          <li>Crisis line, call or text: <span class="fw-phone">988</span></li>
+          <li>Never Use Alone, a peer stays on the line and sends help if you stop responding: <span class="fw-phone">1-800-484-3731</span></li>
+        </ul>
+      </div>
+      <div class="fw-card">
+        <h3>Find treatment</h3>
+        <ul>
+          <li>SAMHSA National Helpline, free, confidential, 24/7, English and Spanish: <span class="fw-phone">1-800-662-4357</span></li>
+          <li><a href="https://findtreatment.gov" target="_blank" rel="noopener">FindTreatment.gov</a>: search by location, insurance and medication offered</li>
+          <li>Ask about buprenorphine by telehealth if a clinic is hard to reach</li>
+        </ul>
+      </div>
+      <div class="fw-card">
+        <h3>Stay safer</h3>
+        <ul>
+          <li>Naloxone is sold without a prescription at most pharmacies, and often free from local health departments</li>
+          <li>Free fentanyl test strips by mail: <a href="https://nextdistro.org" target="_blank" rel="noopener">NEXT Distro</a></li>
+          <li>Drug-checking and harm-reduction info: <a href="https://dancesafe.org" target="_blank" rel="noopener">DanceSafe</a>, <a href="https://tripsit.me" target="_blank" rel="noopener">TripSit</a></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <details id="about">
+    <summary>About this data</summary>
+    <ul>
+      <li>Overdose counts are CDC provisional predictions for rolling 12-month periods, taken from releases between June and October 2026. Each new release revises earlier months, so points from different releases don't line up exactly.</li>
+      <li>DEA pill figures count pills holding 2 mg or more of fentanyl. Years are calendar years except fiscal 2025. DEA reported 76% for fiscal 2023, versus 70% for calendar 2023 shown here.</li>
+      <li>Seizure and lab data show what police found and tested, not the whole supply. Drug-checking studies use samples people chose to send in.</li>
+      <li>This page is a snapshot. It doesn't update itself; the data lives in a JSON block at the top of the page's script and can be updated by hand.</li>
+    </ul>
+  </details>
+
+  <details id="sources">
+    <summary>Sources</summary>
+    <ul>
+      <li><a href="https://www.addictionpas.org/news/cdc-provisional-overdose-deaths-march-2026-08" target="_blank" rel="noopener">CDC NCHS provisional (via addictionpas.org summary, data as of Aug 4 2026)</a></li>
+      <li><a href="https://www.medicaldaily.com/cdc-overdose-deaths-69147-decline-2026-policy-risks-476180" target="_blank" rel="noopener">CDC NCHS provisional, released Jun 17 2026</a></li>
+      <li><a href="https://www.safestates.org/news/733576/CDC-Shares-New-Tools-Data-Updates-and-Overdose-Prevention-Insights.htm" target="_blank" rel="noopener">CDC NCHS provisional (Safe States summary)</a></li>
+      <li><a href="https://www.cdc.gov/media/releases/2026/cdc-launches-new-overdose-prevention-data-channel.html" target="_blank" rel="noopener">CDC press release, Aug 31 2026</a></li>
+      <li><a href="https://getdetox.com/drug-overdose-statistics/" target="_blank" rel="noopener">CDC NVSS provisional dataset, retrieved Oct 16 2026 (via getdetox.com)</a></li>
+      <li><a href="https://www.dea.gov/alert/dea-laboratory-testing-reveals-6-out-10-fentanyl-laced-fake-prescription-pills-now-contain" target="_blank" rel="noopener">DEA pill testing, 2021</a></li>
+      <li><a href="https://www.sjpd.org/Home/Components/News/News/2118/566" target="_blank" rel="noopener">DEA pill testing, 2023</a></li>
+      <li><a href="https://www.dea.gov/press-releases/2024/12/16/overdose-deaths-decline-fentanyl-threat-looms" target="_blank" rel="noopener">DEA pill testing, 2024</a></li>
+      <li><a href="https://abc7news.com/post/disruption-fentanyl-supply-chain-is-working-purity-levels-take-drastic-drop-dea-says/18296991/" target="_blank" rel="noopener">DEA pill testing, FY2025</a></li>
+      <li><a href="https://www.cdc.gov/overdose-prevention/situation-summary/medetomidine.html" target="_blank" rel="noopener">CDC medetomidine situation summary</a></li>
+      <li><a href="https://www.whitehouse.gov/briefings-statements/2026/04/office-of-national-drug-control-policy-cdc-release-health-advisory-on-medetomidine-in-illicit-fentanyl/" target="_blank" rel="noopener">ONDCP/CDC medetomidine advisory, Apr 2026</a></li>
+      <li><a href="https://www.samhsa.gov/newsroom/press-announcements/20260727/samhsa-releases-annual-national-survey-on-drug-use-and-health" target="_blank" rel="noopener">SAMHSA 2025 NSDUH release</a></li>
+      <li><a href="https://catalog.data.gov/dataset/vsrr-provisional-drug-overdose-death-counts" target="_blank" rel="noopener">CDC VSRR provisional overdose death counts (dataset)</a></li>
+      <li><a href="https://www.dea.gov/documents/2024/2024-04/2024-04-26/statement-dea-administrator-anne-milgram-increase-dea-fentanyl" target="_blank" rel="noopener">Xylazine (“tranq”) — 30% of fentanyl powder DEA seized in 2023 contained xylazine</a></li>
+      <li><a href="https://www.news4jax.com/health/2026/09/11/what-are-nitazenes-jacksonville-brothers-case-highlights-growing-concern-over-counterfeit-pills/" target="_blank" rel="noopener">Nitazenes — Found in pills sold as “fent-free” oxycodone in a 2026 federal case</a></li>
+      <li><a href="https://www.addictionpolicy.org/post/new-cdc-reports-an-estimated-70-of-overdose-deaths-involved-fentanyl-re-emergence-of-carfentanil-a" target="_blank" rel="noopener">Carfentanil — Deaths with carfentanil detected rose from 29 (H1 2023) to 238 (H1 202…</a></li>
+      <li><a href="https://stacks.cdc.gov/view/cdc/136129" target="_blank" rel="noopener">Fentanyl in stimulants — A mail-in drug checking study found fentanyl in 14.8% of powder cocain…</a></li>
+    </ul>
+  </details>
+  <footer class="fw-muted">Built by [Your name] with Claude. Data current to November 10, 2026. Not medical advice.</footer>
+</div>
+</main>
+<script>
+window.DASH_DATA = {"overdose_trend": [{"period_end": "2025-03", "label": "12 mo. to Mar 2025", "deaths_all": 77306, "deaths_synthetic_opioids": 44782, "source": "CDC NCHS provisional (via addictionpas.org summary, data as of Aug 4 2026)", "url": "https://www.addictionpas.org/news/cdc-provisional-overdose-deaths-march-2026-08"}, {"period_end": "2026-01", "label": "12 mo. to Jan 2026", "deaths_all": 69147, "deaths_synthetic_opioids": null, "source": "CDC NCHS provisional, released Jun 17 2026", "url": "https://www.medicaldaily.com/cdc-overdose-deaths-69147-decline-2026-policy-risks-476180"}, {"period_end": "2026-02", "label": "12 mo. to Feb 2026", "deaths_all": 68641, "deaths_synthetic_opioids": null, "source": "CDC NCHS provisional (Safe States summary)", "url": "https://www.safestates.org/news/733576/CDC-Shares-New-Tools-Data-Updates-and-Overdose-Prevention-Insights.htm"}, {"period_end": "2026-03", "label": "12 mo. to Mar 2026", "deaths_all": 67798, "deaths_synthetic_opioids": 35976, "source": "CDC press release, Aug 31 2026", "url": "https://www.cdc.gov/media/releases/2026/cdc-launches-new-overdose-prevention-data-channel.html"}, {"period_end": "2026-05", "label": "12 mo. to May 2026", "deaths_all": 66478, "deaths_synthetic_opioids": null, "source": "CDC NVSS provisional dataset, retrieved Oct 16 2026 (via getdetox.com)", "url": "https://getdetox.com/drug-overdose-statistics/"}], "pill_lethality": [{"year": "2021", "pct_lethal": 40, "note": "DEA lab testing", "url": "https://www.dea.gov/alert/dea-laboratory-testing-reveals-6-out-10-fentanyl-laced-fake-prescription-pills-now-contain"}, {"year": "2022", "pct_lethal": 60, "note": "DEA lab testing", "url": "https://www.dea.gov/alert/dea-laboratory-testing-reveals-6-out-10-fentanyl-laced-fake-prescription-pills-now-contain"}, {"year": "2023", "pct_lethal": 70, "note": "DEA lab testing (DEA also cites 76% for fiscal 2023)", "url": "https://www.sjpd.org/Home/Components/News/News/2118/566"}, {"year": "2024", "pct_lethal": 50, "note": "DEA lab testing", "url": "https://www.dea.gov/press-releases/2024/12/16/overdose-deaths-decline-fentanyl-threat-looms"}, {"year": "FY2025", "pct_lethal": 29, "note": "DEA lab testing, fiscal year 2025", "url": "https://abc7news.com/post/disruption-fentanyl-supply-chain-is-working-purity-levels-take-drastic-drop-dea-says/18296991/"}], "medetomidine": [{"year": "2023", "nflis_reports": 247}, {"year": "2024", "nflis_reports": 2616}, {"year": "2025", "nflis_reports": 8233}], "treatment_gap": [{"group": "Any substance use disorder", "needed_millions": 47.2, "received_millions": 7.6, "pct_received": 16.0}, {"group": "Opioid use disorder (got medication)", "needed_millions": 4.0, "received_millions": 0.623, "pct_received": 15.7}], "adulterants": [{"name": "Counterfeit pills", "what": "Pressed pills made to look like oxycodone (M30s), Percocet, Xanax or Adderall", "found_in": "Street and social-media sales; any pill not from a pharmacy", "naloxone": "Yes, if opioid-based", "key_fact": "DEA found 29% of fentanyl pills tested in FY2025 held a potentially lethal dose, down from 76% in FY2023", "url": "https://abc7news.com/post/disruption-fentanyl-supply-chain-is-working-purity-levels-take-drastic-drop-dea-says/18296991/"}, {"name": "Xylazine (“tranq”)", "what": "Non-opioid veterinary sedative", "found_in": "Mostly fentanyl powder; some pills", "naloxone": "No: reverses the fentanyl, not the xylazine", "key_fact": "30% of fentanyl powder DEA seized in 2023 contained xylazine", "url": "https://www.dea.gov/documents/2024/2024-04/2024-04-26/statement-dea-administrator-anne-milgram-increase-dea-fentanyl"}, {"name": "Medetomidine (“rhino tranq”, “dex”)", "what": "Veterinary sedative, stronger than xylazine; severe withdrawal", "found_in": "Fentanyl: 98% of medetomidine-positive samples also had fentanyl", "naloxone": "No: give it anyway for the fentanyl", "key_fact": "Drug-seizure reports rose from 247 (2023) to 8,233 (2025); CDC health advisory April 2026", "url": "https://www.cdc.gov/overdose-prevention/situation-summary/medetomidine.html"}, {"name": "Nitazenes", "what": "Synthetic opioids, many stronger than fentanyl; never approved for medical use", "found_in": "Fake oxycodone and benzo pills, fentanyl powder, heroin, some vapes", "naloxone": "Yes, but may need more than one dose", "key_fact": "Found in pills sold as “fent-free” oxycodone in a 2026 federal case", "url": "https://www.news4jax.com/health/2026/09/11/what-are-nitazenes-jacksonville-brothers-case-highlights-growing-concern-over-counterfeit-pills/"}, {"name": "Carfentanil", "what": "Fentanyl analog about 100× stronger than fentanyl", "found_in": "Fentanyl powder and pills; standard test strips may miss it", "naloxone": "Yes, act fast; more doses may be needed", "key_fact": "Deaths with carfentanil detected rose from 29 (H1 2023) to 238 (H1 2024), across 37 states", "url": "https://www.addictionpolicy.org/post/new-cdc-reports-an-estimated-70-of-overdose-deaths-involved-fentanyl-re-emergence-of-carfentanil-a"}, {"name": "Fentanyl in stimulants", "what": "Fentanyl found in cocaine or meth, often powder forms", "found_in": "Powder cocaine and powder meth more than crack or crystal", "naloxone": "Yes, for the fentanyl", "key_fact": "A mail-in drug checking study found fentanyl in 14.8% of powder cocaine and 12.5% of powder meth samples", "url": "https://stacks.cdc.gov/view/cdc/136129"}], "news": [{"date": "2026-11-09", "topic": "Trafficking", "headline": "Mexico arrests a regional CJNG cartel leader using DEA intelligence", "source": "SOFX / CBS News", "url": "https://sofx.com/alleged-cjng-cartel-leader-wanted-by-u-s-arrested-in-mexico"}, {"date": "2026-11-06", "topic": "Drug supply", "headline": "San Diego County warns medetomidine is turning up in its drug supply", "source": "Yahoo News", "url": "https://yahoo.com/news/us/articles/drug-detected-san-diego-countys-003337205.html"}, {"date": "2026-11-03", "topic": "Overdose crisis", "headline": "CDC estimates show overdose deaths down about 12% in the year to March 2026", "source": "Axios", "url": "https://www.axios.com/2026/11/03/overdose-deaths-falling-cdc"}, {"date": "2026-10-22", "topic": "Precursors", "headline": "DEA says precursors come mainly from China, with more now shipped from India", "source": "Spotlight on America", "url": "https://thenationaldesk.com/news/spotlight-on-america/fentanyl-deaths-synthetic-opioid-deaths-dea-fentanyl-warning-fentanyl-pills-naloxone-xylazine-nitazenes-cartel-drug-supply-precursor-chemicals-national-red-ribbon-week"}, {"date": "2026-10-21", "topic": "Precursors", "headline": "Officials say Chinese chemical shipments to Mexican cartels continue despite new controls", "source": "Washington Times", "url": "https://www.washingtontimes.com/news/2026/oct/21/china-still-shipping-fentanyl-precursors-mexican-cartels/"}, {"date": "2026-10-21", "topic": "Border", "headline": "Arizona ports see more fentanyl seizures but smaller, better-hidden loads", "source": "KOLD", "url": "https://www.kold.com/2026/10/22/us-customs-border-protection-gives-update-border-security/?outputType=amp"}, {"date": "2026-10-07", "topic": "Laws & policy", "headline": "Congressional Research Service primer on China's role and new export controls", "source": "Congress.gov (CRS)", "url": "https://www.congress.gov/crs-product/IF10890"}, {"date": "2026-09-22", "topic": "Precursors", "headline": "China adds two more chemicals to its North America export-permit list, now 18", "source": "Geopolitechs", "url": "https://www.geopolitechs.org/p/china-expands-controls-on-fentanyl"}, {"date": "2026-09-11", "topic": "Drug supply", "headline": "Federal case finds nitazenes in pills sold online as “fent-free” oxycodone", "source": "News4JAX", "url": "https://www.news4jax.com/health/2026/09/11/what-are-nitazenes-jacksonville-brothers-case-highlights-growing-concern-over-counterfeit-pills/"}, {"date": "2026-09-01", "topic": "Border", "headline": "CBP fentanyl seizures keep falling: about 10,369 lbs in FY2026 through August", "source": "Voz", "url": "https://voz.us/en/society/261001/39571/drug-seizures-borders-fiscal-year-2026.html"}, {"date": "2026-07-27", "topic": "Treatment", "headline": "SAMHSA survey: only 16% of people who needed substance use treatment got it in 2025", "source": "SAMHSA", "url": "https://www.samhsa.gov/newsroom/press-announcements/20260727/samhsa-releases-annual-national-survey-on-drug-use-and-health"}, {"date": "2026-05-01", "topic": "Pharma", "headline": "Purdue Pharma's $7.4B settlement takes effect; company replaced by Knoa Pharma", "source": "ABC News / AP", "url": "https://abcnews.com/Business/wireStory/oxycontin-maker-purdue-pharmas-settlement-numbers-132569236"}, {"date": "2026-04-06", "topic": "Drug supply", "headline": "White House and CDC issue health advisory on medetomidine in illicit fentanyl", "source": "WhiteHouse.gov", "url": "https://www.whitehouse.gov/briefings-statements/2026/04/office-of-national-drug-control-policy-cdc-release-health-advisory-on-medetomidine-in-illicit-fentanyl/"}, {"date": "2026-01-15", "topic": "Treatment", "headline": "Telehealth buprenorphine prescribing made permanent under a new federal rule", "source": "Benton Institute", "url": "https://www.benton.org/headlines/federal-government-permanently-extends-addiction-treatment-through-telehealth"}, {"date": "2025-07-16", "topic": "Laws & policy", "headline": "HALT Fentanyl Act signed, permanently making fentanyl look-alikes Schedule I", "source": "Senate Judiciary Committee", "url": "https://www.judiciary.senate.gov/press/rep/releases/grassley-led-halt-fentanyl-act-becomes-law"}]};
+(function () {
+  const calcs = {}, draws = [], P = {};
+  const cache = {};
+  function calcValue(id) {
+    const c = calcs[id];
+    return c.fn(...c.inputs.map((i) => (DASH_DATA[i] || [])));
+  }
+  window.dash = {
+    colors: ['var(--chart-1)'],
+    data(id) {
+      if (calcs[id]) return { status: 'ok', data: cache[id] ?? (cache[id] = calcValue(id)) };
+      return DASH_DATA[id] ? { status: 'ok', data: DASH_DATA[id] } : { status: 'missing', data: [] };
+    },
+    calc(id, spec) { calcs[id] = spec; },
+    loader() {},
+    onData(fn) { fn(); },
+    draw(name, fn) { if (fn) draws.push([name, fn]); else run(name); },
+    params() { return P; },
+    setParams(o) { Object.assign(P, o); run(); },
+    resetParams() { for (const k in P) delete P[k]; run(); },
+    setLink() {}, refresh() {}
+  };
+  function run(only) {
+    for (const [name, fn] of draws) {
+      if (only && name !== only) continue;
+      document.querySelectorAll('[data-draw="' + name + '"]').forEach((el) => { try { fn(el); } catch (e) { console.error(name, e); } });
+    }
+  }
+  window.addEventListener('DOMContentLoaded', () => run());
+  let t; window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(run, 150); });
+})();
+</script>
+<script>
+dash.calc('od_change', {
+  inputs: ['overdose_trend'],
+  title: 'Change in predicted overdose deaths',
+  description: 'Latest rolling 12-month count compared with the earliest one in the series.',
+  fn: (trend) => {
+    if (!trend.length) return [];
+    const rows = trend.slice().sort((a, b) => d3.ascending(a.period_end, b.period_end));
+    const base = rows[0], latest = rows[rows.length - 1];
+    return [{
+      base_label: base.label, base_deaths: base.deaths_all,
+      latest_label: latest.label, latest_deaths: latest.deaths_all,
+      pct_change: (latest.deaths_all - base.deaths_all) / base.deaths_all
+    }];
+  }
+});
+
+window.fw = {
+  fmt: d3.format(','),
+  pct: d3.format('.0%'),
+  dashIfNot(el, st) { if (st !== 'ok') { el.textContent = '—'; return true; } return false; },
+  failed(el, st) {
+    el.replaceChildren();
+    if (st === 'error' || st === 'missing') { const p = document.createElement('p'); p.className = 'fw-muted'; p.textContent = 'Failed to load'; el.append(p); }
+    else { el.textContent = '—'; }
+  },
+  tip(el) {
+    let t = el.querySelector('.fw-tip');
+    if (!t) { t = document.createElement('div'); t.className = 'fw-tip'; t.hidden = true; el.append(t); }
+    return {
+      show(html, x, y) { t.replaceChildren(); html.forEach((line, i) => { const d = document.createElement('div'); d.textContent = line; if (i === 0) d.style.fontWeight = '500'; t.append(d); }); t.hidden = false; const w = t.offsetWidth; const left = Math.max(0, Math.min(x + 12, el.clientWidth - w)); t.style.left = left + 'px'; t.style.top = Math.max(0, y - 40) + 'px'; },
+      hide() { t.hidden = true; }
+    };
+  },
+  svg(el, w, h, label) {
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${w} ${h}`).attr('role', 'img').attr('aria-label', label);
+    return svg;
+  }
+};
+</script>
+<script>
+// Takeaway and tiles
+dash.draw('od-latest', (el) => { const r = dash.data('od_change'); if (fw.dashIfNot(el, r.status) || !r.data.length) return; el.textContent = fw.fmt(r.data[0].latest_deaths); });
+dash.draw('od-latest-label', (el) => { const r = dash.data('od_change'); if (fw.dashIfNot(el, r.status) || !r.data.length) return; el.textContent = r.data[0].latest_label.replace('12 mo.', '12 months'); });
+dash.draw('od-base-label', (el) => { const r = dash.data('od_change'); if (fw.dashIfNot(el, r.status) || !r.data.length) return; el.textContent = 'the ' + r.data[0].base_label.replace('12 mo.', '12 months'); });
+dash.draw('od-change', (el) => { const r = dash.data('od_change'); if (fw.dashIfNot(el, r.status) || !r.data.length) return; el.textContent = d3.format('.0%')(Math.abs(r.data[0].pct_change)); el.style.color = r.data[0].pct_change < 0 ? 'var(--color-ok)' : 'var(--color-bad)'; });
+
+function fwPick(id, key, val) { const r = dash.data(id); return r.status === 'ok' ? r.data.find((d) => String(d[key]) === val) : null; }
+dash.draw('t-deaths', (el) => { const d = fwPick('overdose_trend', 'period_end', '2026-05'); el.textContent = d ? fw.fmt(d.deaths_all) : '—'; });
+dash.draw('t-pills', (el) => { const d = fwPick('pill_lethality', 'year', 'FY2025'); el.textContent = d ? d.pct_lethal + '%' : '—'; });
+dash.draw('t-mede', (el) => { const d = fwPick('medetomidine', 'year', '2025'); el.textContent = d ? fw.fmt(d.nflis_reports) : '—'; });
+dash.draw('t-treat', (el) => { const d = fwPick('treatment_gap', 'group', 'Any substance use disorder'); el.textContent = d ? d.pct_received + '%' : '—'; });
+</script>
+<script>
+// Overdose line chart
+dash.draw('c-deaths', (el) => {
+  const r = dash.data('overdose_trend');
+  if (r.status !== 'ok' || !r.data.length) { fw.failed(el, r.status); return; }
+  el.replaceChildren();
+  const parse = d3.utcParse('%Y-%m');
+  const rows = r.data.map((d) => ({ ...d, date: parse(d.period_end) })).sort((a, b) => a.date - b.date);
+  const W = Math.max(280, el.clientWidth || 400), H = 240, m = { t: 22, r: 16, b: 28, l: 52 };
+  const x = d3.scaleUtc().domain(d3.extent(rows, (d) => d.date)).range([m.l, W - m.r]);
+  const ext = d3.extent(rows, (d) => d.deaths_all);
+  const y = d3.scaleLinear().domain([ext[0] * 0.95, ext[1] * 1.03]).nice().range([H - m.b, m.t]);
+  const svg = fw.svg(el, W, H, 'Line chart of predicted 12-month overdose deaths, falling from ' + fw.fmt(rows[0].deaths_all) + ' to ' + fw.fmt(rows[rows.length - 1].deaths_all));
+  svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(Math.min(5, Math.floor(W / 90))).tickFormat(d3.utcFormat('%b %Y')).tickSizeOuter(0));
+  svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(d3.format('~s')).tickSize(-(W - m.l - m.r))).call((g) => g.select('.domain').remove());
+  svg.append('path').datum(rows).attr('fill', 'none').style('stroke', dash.colors[0]).attr('stroke-width', 2.5).attr('d', d3.line().x((d) => x(d.date)).y((d) => y(d.deaths_all)));
+  const tip = fw.tip(el);
+  svg.selectAll('circle').data(rows).join('circle').attr('cx', (d) => x(d.date)).attr('cy', (d) => y(d.deaths_all)).attr('r', 5).style('fill', dash.colors[0]).style('stroke', 'var(--color-panel)').attr('stroke-width', 2)
+    .on('pointerenter', (e, d) => { const b = el.getBoundingClientRect(); tip.show([d.label, fw.fmt(d.deaths_all) + ' deaths'], e.clientX - b.left, e.clientY - b.top); })
+    .on('pointerleave', () => tip.hide());
+  const last = rows[rows.length - 1], first = rows[0];
+  svg.append('text').attr('x', x(first.date)).attr('y', y(first.deaths_all) - 10).attr('text-anchor', 'start').text(fw.fmt(first.deaths_all));
+  svg.append('text').attr('x', x(last.date)).attr('y', y(last.deaths_all) - 10).attr('text-anchor', 'end').text(fw.fmt(last.deaths_all));
+});
+
+// Pill lethality bars
+dash.draw('c-pills', (el) => {
+  const r = dash.data('pill_lethality');
+  if (r.status !== 'ok' || !r.data.length) { fw.failed(el, r.status); return; }
+  el.replaceChildren();
+  const rows = r.data;
+  const W = Math.max(280, el.clientWidth || 400), H = 240, m = { t: 22, r: 8, b: 28, l: 8 };
+  const x = d3.scaleBand().domain(rows.map((d) => d.year)).range([m.l, W - m.r]).padding(0.3);
+  const y = d3.scaleLinear().domain([0, 100]).range([H - m.b, m.t]);
+  const svg = fw.svg(el, W, H, 'Bar chart of the share of DEA-tested fentanyl pills with a potentially lethal dose, by year');
+  svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickSizeOuter(0));
+  const tip = fw.tip(el);
+  const latest = rows[rows.length - 1];
+  svg.selectAll('rect').data(rows).join('rect').attr('x', (d) => x(d.year)).attr('width', x.bandwidth()).attr('y', (d) => y(d.pct_lethal)).attr('height', (d) => y(0) - y(d.pct_lethal)).attr('rx', 3)
+    .style('fill', (d) => d === latest ? dash.colors[0] : 'var(--cds-chart-muted)')
+    .on('pointerenter', (e, d) => { const b = el.getBoundingClientRect(); tip.show([d.year, d.pct_lethal + '% of pills tested', d.note], e.clientX - b.left, e.clientY - b.top); })
+    .on('pointerleave', () => tip.hide());
+  svg.selectAll('.lbl').data(rows).join('text').attr('class', 'lbl').attr('x', (d) => x(d.year) + x.bandwidth() / 2).attr('y', (d) => y(d.pct_lethal) - 6).attr('text-anchor', 'middle').text((d) => d.pct_lethal + '%');
+});
+
+// Medetomidine bars
+dash.draw('c-mede', (el) => {
+  const r = dash.data('medetomidine');
+  if (r.status !== 'ok' || !r.data.length) { fw.failed(el, r.status); return; }
+  el.replaceChildren();
+  const rows = r.data;
+  const W = Math.max(280, el.clientWidth || 400), H = 200, m = { t: 22, r: 8, b: 28, l: 8 };
+  const x = d3.scaleBand().domain(rows.map((d) => d.year)).range([m.l, W - m.r]).padding(0.35);
+  const y = d3.scaleLinear().domain([0, d3.max(rows, (d) => d.nflis_reports) * 1.1]).range([H - m.b, m.t]);
+  const svg = fw.svg(el, W, H, 'Bar chart of medetomidine lab reports: ' + rows.map((d) => d.year + ' ' + fw.fmt(d.nflis_reports)).join(', '));
+  svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickSizeOuter(0));
+  const tip = fw.tip(el);
+  svg.selectAll('rect').data(rows).join('rect').attr('x', (d) => x(d.year)).attr('width', x.bandwidth()).attr('y', (d) => y(d.nflis_reports)).attr('height', (d) => y(0) - y(d.nflis_reports)).attr('rx', 3).style('fill', dash.colors[0])
+    .on('pointerenter', (e, d) => { const b = el.getBoundingClientRect(); tip.show([d.year, fw.fmt(d.nflis_reports) + ' lab reports'], e.clientX - b.left, e.clientY - b.top); })
+    .on('pointerleave', () => tip.hide());
+  svg.selectAll('.lbl').data(rows).join('text').attr('class', 'lbl').attr('x', (d) => x(d.year) + x.bandwidth() / 2).attr('y', (d) => y(d.nflis_reports) - 6).attr('text-anchor', 'middle').text((d) => fw.fmt(d.nflis_reports));
+});
+
+// Treatment gap
+dash.draw('c-gap', (el) => {
+  const r = dash.data('treatment_gap');
+  if (r.status !== 'ok' || !r.data.length) { fw.failed(el, r.status); return; }
+  el.replaceChildren();
+  const rows = r.data;
+  const W = Math.max(280, el.clientWidth || 400), rowH = 58, H = rows.length * rowH + 8;
+  const x = d3.scaleLinear().domain([0, 100]).range([0, W]);
+  const svg = fw.svg(el, W, H, 'Bars showing the share of people who needed treatment and got it: ' + rows.map((d) => d.group + ' ' + d.pct_received + '%').join('; '));
+  const tip = fw.tip(el);
+  const g = svg.selectAll('g.row').data(rows).join('g').attr('class', 'row').attr('transform', (d, i) => `translate(0,${i * rowH})`);
+  g.append('text').attr('x', 0).attr('y', 14).text((d) => d.group + ': ' + d.pct_received + '% (' + d3.format(',.1f')(d.received_millions) + 'M of ' + d3.format(',.1f')(d.needed_millions) + 'M)');
+  g.append('rect').attr('x', 0).attr('y', 22).attr('width', W).attr('height', 18).attr('rx', 3).style('fill', 'var(--cds-chart-muted)');
+  g.append('rect').attr('x', 0).attr('y', 22).attr('width', (d) => x(d.pct_received)).attr('height', 18).attr('rx', 3).style('fill', dash.colors[0]);
+  g.on('pointerenter', (e, d) => { const b = el.getBoundingClientRect(); tip.show([d.group, d.pct_received + '% got it', (100 - d.pct_received).toFixed(1) + '% did not'], e.clientX - b.left, e.clientY - b.top); }).on('pointerleave', () => tip.hide());
+});
+</script>
+<script>
+// Adulterant cards
+dash.draw('subs', (el) => {
+  const r = dash.data('adulterants');
+  if (r.status !== 'ok') { fw.failed(el, r.status); return; }
+  el.replaceChildren();
+  const enc = (s) => encodeURIComponent(s);
+  r.data.forEach((d) => {
+    const card = document.createElement('article');
+    card.className = 'fw-card fw-sub';
+    const where = 'name=' + enc(d.name);
+    const h = document.createElement('h3'); h.textContent = d.name; h.dataset.source = 'adulterants'; h.dataset.field = 'name'; h.dataset.where = where;
+    const dl = document.createElement('dl');
+    [['What it is', 'what'], ['Where it shows up', 'found_in'], ['Does naloxone work?', 'naloxone'], ['Latest data', 'key_fact']].forEach(([lab, f]) => {
+      const dt = document.createElement('dt'); dt.textContent = lab;
+      const dd = document.createElement('dd');
+      const span = document.createElement('span'); span.textContent = d[f]; span.dataset.source = 'adulterants'; span.dataset.field = f; span.dataset.where = where;
+      if (f === 'naloxone') span.className = 'fw-tag' + (/^No/.test(d[f]) ? ' no' : '');
+      dd.append(span); dl.append(dt, dd);
+    });
+    card.append(h, dl);
+    el.append(card);
+  });
+});
+
+// News topic select and list
+dash.draw('topic', (sel) => {
+  const r = dash.data('news');
+  const topics = r.status === 'ok' ? [...new Set(r.data.map((d) => d.topic))].sort() : [];
+  sel.replaceChildren(new Option('All topics', ''), ...topics.map((t) => new Option(t, t)));
+  sel.value = dash.params().topic ?? '';
+  sel.onchange = () => dash.setParams({ topic: sel.value || null });
+});
+dash.draw('news-list', (el) => {
+  const r = dash.data('news');
+  el.replaceChildren();
+  if (r.status !== 'ok') { const li = document.createElement('li'); li.className = 'fw-muted'; li.textContent = r.status === 'error' ? 'Failed to load' : '—'; el.append(li); return; }
+  const topic = dash.params().topic;
+  const fmtD = d3.utcFormat('%b %-d, %Y'), parse = d3.utcParse('%Y-%m-%d');
+  r.data.filter((d) => !topic || d.topic === topic).sort((a, b) => d3.descending(a.date, b.date)).forEach((d) => {
+    const li = document.createElement('li');
+    const where = 'url=' + encodeURIComponent(d.url);
+    const meta = document.createElement('span'); meta.className = 'fw-muted';
+    const date = document.createElement('span'); date.textContent = fmtD(parse(d.date)); date.dataset.source = 'news'; date.dataset.field = 'date'; date.dataset.where = where;
+    const src = document.createElement('span'); src.textContent = d.source; src.dataset.source = 'news'; src.dataset.field = 'source'; src.dataset.where = where;
+    const tag = document.createElement('span'); tag.className = 'fw-tag'; tag.textContent = d.topic;
+    meta.append(date, ' · ', src, ' ', tag);
+    const a = document.createElement('a'); a.href = d.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = d.headline; a.dataset.source = 'news'; a.dataset.field = 'headline'; a.dataset.where = where;
+    li.append(a, meta);
+    el.append(li);
+  });
+});
+</script>
+</body>
+</html>
